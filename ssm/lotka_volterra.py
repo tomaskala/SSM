@@ -17,7 +17,6 @@ import pyximport
 pyximport.install(setup_args={"include_dirs": np.get_include()})
 
 from scipy import stats
-from statsmodels.graphics.tsaplots import plot_acf
 
 from ssm.lotka_volterra_routines import step_lv
 from ssm.mcmc import (
@@ -205,7 +204,7 @@ def main():
         ax1.plot(param_values, color="dimgrey")
         ax1.axhline(truth[i], color="crimson", lw=2)
 
-        #plot_acf(param_values, lags=100, ax=ax2, color="dimgrey")
+        plot_acf(param_values, lags=100, ax=ax2, color="dimgrey")
 
         ax3.set_title("Histogram")
         ax3.hist(param_values, density=True, bins=30, color="dimgrey")
