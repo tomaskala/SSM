@@ -378,7 +378,7 @@ class MetropolisHastingsABC(MetropolisHastings, abc.ABC):
             x = x[rows]
 
         loglik -= T * math.log(self.n_particles)
-        assert loglik <= 0.0
+        assert loglik <= 0.0  # TODO: This fails. Count how many times.
         return loglik
 
     def _alphath_closest(

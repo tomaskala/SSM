@@ -69,10 +69,34 @@ args = parser.parse_args()
 
 class ABCLorenzSystem(MetropolisHastingsABC):
     def _transition(self, x: np.ndarray, t: int, theta: np.ndarray) -> np.ndarray:
-        pass  # TODO
+        T = self.const["T"]
+        sqrt_T = np.sqrt(T)
+        S = theta[0]
+        R = theta[1]
+        B = theta[2]
+
+        out = np.empty_like(x)
+        U = self.random_state.normal(size=x.shape)
+        out[:, 0] = x[:, 0] - T * S * (x[:, 0] - x[:, 1]) + sqrt_T * U[:, 0]
+        out[:, 1] = (
+            x[:, 1] + T * (R * x[:, 0] - x[:, 1] - x[:, 0] * x[:, 2]) + sqrt_T * U[:, 1]
+        )
+        out[:, 2] = x[:, 2] + T * (x[:, 0] * x[:, 1] - B * x[:, 2]) + sqrt_T * U[:, 2]
+
+        assert out.shape == x.shape
+        return out
 
     def _measurement_model(self, x: np.ndarray, theta: np.ndarray) -> np.array:
-        pass  # TODO
+        k = theta[3]
+        var = self.const["observation_variance"]
+
+        mean0 = k * x[:, 0]
+        mean2 = k * x[:, 2]
+
+        mean = np.c_[mean0, mean2]
+        assert mean.shape == (self.n_particles, 2)
+
+        return mean
 
 
 class ParticleLorenzSystem(MetropolisHastingsPF):
