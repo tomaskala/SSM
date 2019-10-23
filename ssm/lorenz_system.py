@@ -106,7 +106,8 @@ class ParticleLorenzSystem(MetropolisHastingsPF):
         mean = np.c_[mean0, mean2]
         assert mean.shape == (self.n_particles, 2)
 
-        out = stats.multivariate_normal.logpdf(y, mean=mean, cov=var)
+        #out = stats.multivariate_normal.logpdf(y, mean=mean, cov=var)
+        out = np.sum(stats.norm.logpdf(y, loc=mean, scale=np.sqrt(var)), axis=1)
         assert out.shape == (self.n_particles,)
 
         return out
@@ -181,7 +182,7 @@ def main():
     T = 1e-3
     observation_variance = 1 / 10
 
-    n_observations = 100  # TODO
+    n_observations = 100
 
     t, y = simulate_ty(
         os.path.join(path, "simulated_data.pickle"),
@@ -217,13 +218,18 @@ def main():
         ]
     )
 
+    scale_S = np.sqrt(60 / np.power(n_particles, 3 / 2))
+    scale_R = np.sqrt(60 / np.power(n_particles, 3 / 2))
+    scale_B = np.sqrt(10 / np.power(n_particles, 3 / 2))
+    scale_k = np.sqrt(1 / np.power(n_particles, 3 / 2))
+
     # TODO
     proposal = Proposal(
         [
-            Distribution(stats.norm, scale=0.01),
-            Distribution(stats.norm, scale=0.01),
-            Distribution(stats.norm, scale=0.01),
-            Distribution(stats.norm, scale=0.01),
+            Distribution(stats.truncnorm, truncnorm=True, scale=scale_S, a=5, b=20),
+            Distribution(stats.truncnorm, truncnorm=True, scale=scale_R, a=18, b=50),
+            Distribution(stats.truncnorm, truncnorm=True, scale=scale_B, a=1, b=8),
+            Distribution(stats.truncnorm, truncnorm=True, scale=scale_k, a=0.5, b=3),
         ]
     )
 
@@ -272,10 +278,8 @@ def main():
         with open(sampled_theta_path, "wb") as f:
             pickle.dump(theta, f)
 
-    theta = np.exp(theta)
     theta = theta[burn_in::thinning]
-    truth = np.array([1, 0.005, 0.6])
-    pretty_names = [r"$c_1$", r"$c_2$", r"$c_3$"]
+    pretty_names = [r"$S$", r"$R$", r"$B$", r"$k$"]
 
     for i in range(theta.shape[1]):
         param_name = pretty_names[i]
@@ -286,13 +290,13 @@ def main():
 
         ax1.set_title("Trace plot")
         ax1.plot(param_values, color="dimgrey")
-        ax1.axhline(truth[i], color="crimson", lw=2)
+        ax1.axhline(theta_true[i], color="crimson", lw=2)
 
         # plot_acf(param_values, lags=100, ax=ax2, color="dimgrey")
 
         ax3.set_title("Histogram")
         ax3.hist(param_values, density=True, bins=30, color="dimgrey")
-        ax3.axvline(truth[i], color="crimson", lw=2)
+        ax3.axvline(theta_true[i], color="crimson", lw=2)
 
         plt.show()
 
