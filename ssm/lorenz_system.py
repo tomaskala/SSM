@@ -69,19 +69,22 @@ args = parser.parse_args()
 
 class ABCLorenzSystem(MetropolisHastingsABC):
     def _transition(self, x: np.ndarray, t: int, theta: np.ndarray) -> np.ndarray:
+        observation_period = self.const["observation_period"]
         T = self.const["T"]
         sqrt_T = np.sqrt(T)
         S = theta[0]
         R = theta[1]
         B = theta[2]
 
-        out = np.empty_like(x)
-        U = self.random_state.normal(size=x.shape)
-        out[:, 0] = x[:, 0] - T * S * (x[:, 0] - x[:, 1]) + sqrt_T * U[:, 0]
-        out[:, 1] = (
-            x[:, 1] + T * (R * x[:, 0] - x[:, 1] - x[:, 0] * x[:, 2]) + sqrt_T * U[:, 1]
-        )
-        out[:, 2] = x[:, 2] + T * (x[:, 0] * x[:, 1] - B * x[:, 2]) + sqrt_T * U[:, 2]
+        for _ in range(observation_period):
+            out = np.empty_like(x)
+            U = self.random_state.normal(size=x.shape)
+            out[:, 0] = x[:, 0] - T * S * (x[:, 0] - x[:, 1]) + sqrt_T * U[:, 0]
+            out[:, 1] = (
+                x[:, 1] + T * (R * x[:, 0] - x[:, 1] - x[:, 0] * x[:, 2]) + sqrt_T * U[:, 1]
+            )
+            out[:, 2] = x[:, 2] + T * (x[:, 0] * x[:, 1] - B * x[:, 2]) + sqrt_T * U[:, 2]
+            x = out
 
         assert out.shape == x.shape
         return out
@@ -101,19 +104,22 @@ class ABCLorenzSystem(MetropolisHastingsABC):
 
 class ParticleLorenzSystem(MetropolisHastingsPF):
     def _transition(self, x: np.ndarray, t: int, theta: np.ndarray) -> np.ndarray:
+        observation_period = self.const["observation_period"]
         T = self.const["T"]
         sqrt_T = np.sqrt(T)
         S = theta[0]
         R = theta[1]
         B = theta[2]
 
-        out = np.empty_like(x)
-        U = self.random_state.normal(size=x.shape)
-        out[:, 0] = x[:, 0] - T * S * (x[:, 0] - x[:, 1]) + sqrt_T * U[:, 0]
-        out[:, 1] = (
-            x[:, 1] + T * (R * x[:, 0] - x[:, 1] - x[:, 0] * x[:, 2]) + sqrt_T * U[:, 1]
-        )
-        out[:, 2] = x[:, 2] + T * (x[:, 0] * x[:, 1] - B * x[:, 2]) + sqrt_T * U[:, 2]
+        for _ in range(observation_period):
+            out = np.empty_like(x)
+            U = self.random_state.normal(size=x.shape)
+            out[:, 0] = x[:, 0] - T * S * (x[:, 0] - x[:, 1]) + sqrt_T * U[:, 0]
+            out[:, 1] = (
+                x[:, 1] + T * (R * x[:, 0] - x[:, 1] - x[:, 0] * x[:, 2]) + sqrt_T * U[:, 1]
+            )
+            out[:, 2] = x[:, 2] + T * (x[:, 0] * x[:, 1] - B * x[:, 2]) + sqrt_T * U[:, 2]
+            x = out
 
         assert out.shape == x.shape
         return out
@@ -146,6 +152,7 @@ def simulate_ty(
     k: float,
     x0: np.ndarray,
     T: float,
+    observation_period: int,
     observation_variance: float,
     random_state=None,
 ):
@@ -161,15 +168,16 @@ def simulate_ty(
         x = x0.copy()
 
         for t in range(1, n_observations + 1):
-            # x_t -> x_{t+1}
-            out = np.empty_like(x)
-            U = random_state.normal(size=3)
-            out[0] = x[0] - T * S * (x[0] - x[1]) + sqrt_T * U[0]
-            out[1] = x[1] + T * (R * x[0] - x[1] - x[0] * x[2]) + sqrt_T * U[1]
-            out[2] = x[2] + T * (x[0] * x[1] - B * x[2]) + sqrt_T * U[2]
-            x = out
+            for _ in range(observation_period):
+                # x_t -> x_{t+1}
+                out = np.empty_like(x)
+                U = random_state.normal(size=3)
+                out[0] = x[0] - T * S * (x[0] - x[1]) + sqrt_T * U[0]
+                out[1] = x[1] + T * (R * x[0] - x[1] - x[0] * x[2]) + sqrt_T * U[1]
+                out[2] = x[2] + T * (x[0] * x[1] - B * x[2]) + sqrt_T * U[2]
+                x = out
 
-            # x_{t+1} -> y_{t+1}
+            # x_{n(t+1)} -> y_{t+1}, n = observation_period
             V = random_state.normal(scale=observation_std, size=2)
             ys[t - 1, 0] = k * x[0] + V[0]
             ys[t - 1, 1] = k * x[2] + V[1]
@@ -204,9 +212,10 @@ def main():
 
     # Constants
     T = 1e-3
+    observation_period = 40
     observation_variance = 1 / 10
 
-    n_observations = 100
+    n_observations = 100  # TODO: Set to 600. This means 600 observations*40 period=24000 time steps, as in the paper.
 
     t, y = simulate_ty(
         os.path.join(path, "simulated_data.pickle"),
@@ -217,6 +226,7 @@ def main():
         k=k,
         x0=x0,
         T=T,
+        observation_period=observation_period,
         observation_variance=observation_variance,
         random_state=random_state,
     )
@@ -228,6 +238,7 @@ def main():
     state_init = x0.copy()
 
     const = {
+        "observation_period": observation_period,
         "observation_variance": observation_variance,
         "times": np.concatenate(([0.0], t)),
         "T": T,
@@ -247,7 +258,6 @@ def main():
     scale_B = np.sqrt(10 / np.power(n_particles, 3 / 2))
     scale_k = np.sqrt(1 / np.power(n_particles, 3 / 2))
 
-    # TODO
     proposal = Proposal(
         [
             Distribution(stats.truncnorm, truncnorm=True, scale=scale_S, a=5, b=20),
@@ -257,8 +267,7 @@ def main():
         ]
     )
 
-    # TODO
-    theta_init = theta_true.copy()
+    theta_init = theta_true.copy()  # TODO: Set to None to sample from the prior distribution.
     random_state = check_random_state(1)
 
     if algorithm == "abcmh":
