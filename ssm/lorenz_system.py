@@ -246,10 +246,10 @@ def main():
 
     prior = Prior(
         [
-            stats.uniform(loc=5, scale=25),
-            stats.uniform(loc=18, scale=68),
-            stats.uniform(loc=1, scale=9),
-            stats.uniform(loc=0.5, scale=3.5),
+            stats.uniform(loc=5, scale=20 - 5),
+            stats.uniform(loc=18, scale=50 - 18),
+            stats.uniform(loc=1, scale=8 - 1),
+            stats.uniform(loc=0.5, scale=3 - 0.5),
         ]
     )
 
