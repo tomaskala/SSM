@@ -160,7 +160,6 @@ def simulate_ty(
         with open(path, mode="rb") as f:
             return pickle.load(f)
     else:
-        random_state = check_random_state(random_state)
         sqrt_T = np.sqrt(T)
         observation_std = np.sqrt(observation_variance)
         ts = np.arange(n_observations)
@@ -212,7 +211,7 @@ def main():
 
     # Constants
     T = 1e-3
-    observation_period = 40
+    observation_period = 1
     observation_variance = 1 / 10
 
     n_observations = 100  # TODO: Set to 600. This means 600 observations*40 period=24000 time steps, as in the paper.
@@ -267,8 +266,15 @@ def main():
         ]
     )
 
-    theta_init = theta_true.copy()  # TODO: Set to None to sample from the prior distribution.
-    random_state = check_random_state(1)
+    theta_init = np.zeros(4)
+    scale = 2.0
+    theta_init[0] = stats.truncnorm.rvs(a=(5 - theta_true[0]) / scale, b = (20 - theta_true[0]) / scale, loc=theta_true[0], scale=scale, random_state=random_state)
+    theta_init[1] = stats.truncnorm.rvs(a=(18 - theta_true[1]) / scale, b = (50 - theta_true[1]) / scale, loc=theta_true[1], scale=scale, random_state=random_state)
+    theta_init[2] = stats.truncnorm.rvs(a=(1 - theta_true[2]) / scale, b = (8 - theta_true[2]) / scale, loc=theta_true[2], scale=scale, random_state=random_state)
+    theta_init[3] = stats.truncnorm.rvs(a=(0.5 - theta_true[3]) / scale, b = (3 - theta_true[3]) / scale, loc=theta_true[3], scale=scale, random_state=random_state)
+
+    print(theta_true)
+    print(theta_init)
 
     if algorithm == "abcmh":
         alpha = args.alpha
