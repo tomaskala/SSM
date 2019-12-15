@@ -26,6 +26,17 @@ from ssm.utils import check_random_state
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
+    "--output-dir",
+    required=False,
+    default=None,
+    help="Directory to store the output to. If None, defaults to `lorenz_system_{algorithm}`.",
+)
+parser.add_argument(
+    "--save-plots",
+    action="store_true",
+    help="Whether to save the plotted graphs or show them.",
+)
+parser.add_argument(
     "--algorithm",
     choices=("abcmh", "pmh"),
     required=True,
@@ -189,7 +200,12 @@ def simulate_ty(
 
 def main():
     algorithm = args.algorithm
-    path = "./lorenz_system_{}".format(algorithm)
+
+    if args.output_dir is None:
+        path = "./lorenz_system_{}".format(algorithm)
+    else:
+        path = args.output_dir
+
     random_state = check_random_state(1)
 
     if not os.path.exists(path):
@@ -337,7 +353,10 @@ def main():
         ax3.hist(param_values, density=True, bins=30, color="dimgrey")
         ax3.axvline(theta_true[i], color="crimson", lw=2)
 
-        plt.show()
+        if args.save_plots:
+            fig.savefig(os.path.join(path, "param_{:02d}.pdf".format(i)))
+        else:
+            plt.show()
 
 
 if __name__ == "__main__":
