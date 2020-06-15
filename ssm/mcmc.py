@@ -4,48 +4,51 @@ import numbers
 from typing import List, Union
 
 import numpy as np
-from scipy.special import logsumexp, softmax
+from scipy.special import expit, logit, logsumexp, softmax
 from scipy.stats import cauchy, laplace, norm, rv_continuous, uniform
 
 from utils import check_random_state
 
 
-def update_truncnorm(loc, params):
-    params["a"] = (params["a"] - loc) / params["scale"]
-    params["b"] = (params["b"] - loc) / params["scale"]
+class Support(abc.ABC):
+    @abc.abstractmethod
+    def map_to(self, x):
+        pass
 
-    return params
+    @abc.abstractmethod
+    def map_from(self, y):
+        pass
+
+
+class Interval(Support):
+    def __init__(self, a, b):
+        assert a < b
+        self.a = a
+        self.b = b
+
+    def map_to(self, x):
+        zero_one = expit(x)
+        return self.a + (self.b - self.a) * zero_one
+
+    def map_from(self, y):
+        zero_one = (y - self.a) / (self.b - self.a)
+        return logit(zero_one)
 
 
 class Distribution:
-    def __init__(self, dist, truncnorm=False, **kwargs):
+    def __init__(self, dist, **kwargs):
         assert (
             "loc" not in kwargs
         ), "the location parameter is to be given explicitly on each distribution invocation"
 
         self.dist = dist
-        self.truncnorm = truncnorm
         self.kwargs = kwargs
 
-        if truncnorm:
-            if "scale" not in kwargs or "a" not in kwargs or "b" not in kwargs:
-                raise ValueError("Truncnorm not parameterized correctly.")
-
     def log_prob(self, x, loc):
-        if self.truncnorm:
-            params = update_truncnorm(loc, self.kwargs.copy())
-        else:
-            params = self.kwargs
+        return self.dist.logpdf(x=x, loc=loc, **self.kwargs)
 
-        return self.dist.logpdf(x=x, loc=loc, **params)
-
-    def sample(self, loc, random_state=None):
-        if self.truncnorm:
-            params = update_truncnorm(loc, self.kwargs.copy())
-        else:
-            params = self.kwargs
-
-        return self.dist.rvs(loc=loc, random_state=random_state, **params)
+    def sample(self, random_state=None):
+        return self.dist.rvs(random_state=random_state, **self.kwargs)
 
 
 class Prior:
@@ -81,22 +84,16 @@ class Proposal:
 
         return log_prob
 
-    def sample(self, loc, random_state=None):
-        assert len(self.distributions) == len(loc)
-        return np.array(
-            [
-                dist.sample(l, random_state=random_state)
-                for l, dist in zip(loc, self.distributions)
-            ],
-            dtype=float,
-        )
+    def sample(self, random_state=None):
+        return np.array([dist.sample(random_state=random_state) for dist in self.distributions])
 
 
 class MetropolisHastings(abc.ABC):
-    def __init__(self, n_samples, prior, proposal, theta_init=None, random_state=None):
+    def __init__(self, n_samples, prior, proposal, supports, theta_init=None, random_state=None):
         self.n_samples = n_samples
         self.prior = prior
         self.proposal = proposal
+        self.supports = supports
         self.theta_init = theta_init
         self.random_state = check_random_state(random_state)
 
@@ -119,14 +116,13 @@ class MetropolisHastings(abc.ABC):
         accepted = 0
 
         for i in range(self.n_samples):
-            theta_prop = self.proposal.sample(theta, random_state=self.random_state)
+            theta_unconstrained = self.unconstrain(theta)
+            theta_prop_unconstrained = theta_unconstrained + self.proposal.sample(random_state=self.random_state)
+            theta_prop = self.constrain(theta_prop_unconstrained)
             log_ratio = 0.0
 
             log_ratio += self.prior.log_prob(theta_prop)
             log_ratio -= self.prior.log_prob(theta)
-
-            log_ratio += self.proposal.log_prob(theta, theta_prop)
-            log_ratio -= self.proposal.log_prob(theta_prop, theta)
 
             loglik_prop = self._log_likelihood_estimate(y, theta_prop)
             log_ratio += loglik_prop
@@ -151,6 +147,13 @@ class MetropolisHastings(abc.ABC):
 
         return thetas
 
+    def constrain(self, x):
+        return np.array([support.map_to(e) for support, e in zip(self.supports, x)])
+
+
+    def unconstrain(self, y):
+        return np.array([support.map_from(e) for support, e in zip(self.supports, y)])
+
     @abc.abstractmethod
     def _log_likelihood_estimate(self, y, theta):
         pass
@@ -165,6 +168,7 @@ class MetropolisHastingsPF(MetropolisHastings, abc.ABC):
         const,
         prior,
         proposal,
+        supports,
         theta_init=None,
         random_state=None,
     ):
@@ -172,6 +176,7 @@ class MetropolisHastingsPF(MetropolisHastings, abc.ABC):
             n_samples=n_samples,
             prior=prior,
             proposal=proposal,
+            supports=supports,
             theta_init=theta_init,
             random_state=random_state,
         )
@@ -296,6 +301,7 @@ class MetropolisHastingsABC(MetropolisHastings, abc.ABC):
         kernel,
         prior,
         proposal,
+        supports,
         theta_init=None,
         random_state=None,
     ):
@@ -307,6 +313,7 @@ class MetropolisHastingsABC(MetropolisHastings, abc.ABC):
             n_samples=n_samples,
             prior=prior,
             proposal=proposal,
+            supports=supports,
             theta_init=theta_init,
             random_state=random_state,
         )

@@ -7,7 +7,7 @@ import pickle
 
 import sys
 
-sys.path.append("/home/tomas/ssm/")
+sys.path.append("/home/tomas/SSM/")
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -16,6 +16,7 @@ from scipy import stats
 
 from ssm.mcmc import (
     Distribution,
+    Interval,
     MetropolisHastingsABC,
     MetropolisHastingsPF,
     Prior,
@@ -268,6 +269,13 @@ def main():
         ]
     )
 
+    supports = [
+        Interval(5, 20),
+        Interval(18, 50),
+        Interval(1, 8),
+        Interval(0.5, 3),
+    ]
+
     scale_S = np.sqrt(60 / np.power(n_particles, 3 / 2))
     scale_R = np.sqrt(60 / np.power(n_particles, 3 / 2))
     scale_B = np.sqrt(10 / np.power(n_particles, 3 / 2))
@@ -275,19 +283,14 @@ def main():
 
     proposal = Proposal(
         [
-            Distribution(stats.truncnorm, truncnorm=True, scale=scale_S, a=5, b=20),
-            Distribution(stats.truncnorm, truncnorm=True, scale=scale_R, a=18, b=50),
-            Distribution(stats.truncnorm, truncnorm=True, scale=scale_B, a=1, b=8),
-            Distribution(stats.truncnorm, truncnorm=True, scale=scale_k, a=0.5, b=3),
+            Distribution(stats.norm, scale=scale_S),
+            Distribution(stats.norm, scale=scale_R),
+            Distribution(stats.norm, scale=scale_B),
+            Distribution(stats.norm, scale=scale_k),
         ]
     )
 
-    theta_init = np.zeros(4)
-    scale = 2.0
-    theta_init[0] = stats.truncnorm.rvs(a=(5 - theta_true[0]) / scale, b = (20 - theta_true[0]) / scale, loc=theta_true[0], scale=scale, random_state=random_state)
-    theta_init[1] = stats.truncnorm.rvs(a=(18 - theta_true[1]) / scale, b = (50 - theta_true[1]) / scale, loc=theta_true[1], scale=scale, random_state=random_state)
-    theta_init[2] = stats.truncnorm.rvs(a=(1 - theta_true[2]) / scale, b = (8 - theta_true[2]) / scale, loc=theta_true[2], scale=scale, random_state=random_state)
-    theta_init[3] = stats.truncnorm.rvs(a=(0.5 - theta_true[3]) / scale, b = (3 - theta_true[3]) / scale, loc=theta_true[3], scale=scale, random_state=random_state)
+    theta_init = None
 
     print(theta_true)
     print(theta_init)
@@ -307,6 +310,7 @@ def main():
             kernel=kernel,
             prior=prior,
             proposal=proposal,
+            supports=supports,
             theta_init=theta_init,
             random_state=random_state,
         )
@@ -318,6 +322,7 @@ def main():
             const=const,
             prior=prior,
             proposal=proposal,
+            supports=supports,
             theta_init=theta_init,
             random_state=random_state,
         )
